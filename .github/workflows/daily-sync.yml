@@ -1,0 +1,47 @@
+name: Daily Sync - Tessie & SimpleFIN
+
+on:
+  schedule:
+    # Run daily at 6 AM UTC (1 AM EST / 2 AM EDT)
+    - cron: '0 6 * * *'
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          pip install requests supabase anthropic
+      
+      - name: Sync Tessie data
+        env:
+          TESSIE_API_TOKEN: ${{ secrets.TESSIE_API_TOKEN }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          CYBERTRUCK_VIN: ${{ secrets.CYBERTRUCK_VIN }}
+        run: python scripts/sync_tessie.py
+      
+      - name: Sync SimpleFIN transactions
+        env:
+          SIMPLEFIN_ACCESS_URL: ${{ secrets.SIMPLEFIN_ACCESS_URL }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: python scripts/sync_simplefin.py
+      
+      - name: Categorize expenses with AI
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          VEHICLE_ID: ${{ secrets.VEHICLE_ID }}
+        run: python scripts/categorize_expenses.py
