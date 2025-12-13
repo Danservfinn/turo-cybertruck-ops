@@ -1,4 +1,4 @@
-name: Daily Sync - Tessie & SimpleFIN
+name: Daily Sync - Bank Transactions & AI Categorization
 
 on:
   schedule:
@@ -20,16 +20,7 @@ jobs:
           python-version: '3.11'
       
       - name: Install dependencies
-        run: |
-          pip install requests supabase anthropic
-      
-      - name: Sync Tessie data
-        env:
-          TESSIE_API_TOKEN: ${{ secrets.TESSIE_API_TOKEN }}
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
-          CYBERTRUCK_VIN: ${{ secrets.CYBERTRUCK_VIN }}
-        run: python scripts/sync_tessie.py
+        run: pip install requests supabase anthropic
       
       - name: Sync SimpleFIN transactions
         env:
