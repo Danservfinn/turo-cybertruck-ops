@@ -1,0 +1,5 @@
+# State files are stored here
+# Do not commit sensitive data
+*.pickle
+*.json
+!.gitkeep

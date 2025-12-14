@@ -1,0 +1,63 @@
+name: Check Turo Messages
+
+on:
+  schedule:
+    # Run every 5 minutes during daytime hours (11 AM - 11 PM UTC = 6 AM - 6 PM EST)
+    - cron: '*/5 11-23 * * *'
+    # Run every 15 minutes overnight
+    - cron: '*/15 0-10 * * *'
+  workflow_dispatch: # Manual trigger
+
+jobs:
+  check-messages:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          pip install requests anthropic google-auth google-auth-oauthlib google-api-python-client
+      
+      - name: Restore Gmail token cache
+        uses: actions/cache@v4
+        with:
+          path: messaging/state/gmail_token.pickle
+          key: gmail-token-${{ github.repository }}
+      
+      - name: Restore processed emails state
+        uses: actions/cache@v4
+        with:
+          path: messaging/state/processed_emails.json
+          key: processed-emails-${{ github.run_id }}
+          restore-keys: |
+            processed-emails-
+      
+      - name: Check for new messages and send notifications
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GMAIL_CREDENTIALS: ${{ secrets.GMAIL_CREDENTIALS }}
+          GMAIL_TOKEN: ${{ secrets.GMAIL_TOKEN }}
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          USE_NTFY: "true"
+        run: |
+          # Write Gmail credentials from secrets
+          mkdir -p messaging/config messaging/state
+          echo "$GMAIL_CREDENTIALS" > messaging/config/gmail_credentials.json
+          echo "$GMAIL_TOKEN" | base64 -d > messaging/state/gmail_token.pickle 2>/dev/null || true
+          
+          cd messaging/scripts
+          python workflow.py
+      
+      - name: Save processed emails state
+        uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: messaging/state/processed_emails.json
+          key: processed-emails-${{ github.run_id }}

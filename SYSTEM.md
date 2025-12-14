@@ -538,7 +538,77 @@ ALTER TABLE trips ADD COLUMN weather TEXT;
 
 ---
 
+## 💬 Guest Messaging System
+
+### Overview
+AI-assisted responses to Turo guest messages with human-in-the-loop approval.
+
+```
+Turo Email → Gmail API → Claude AI → ntfy Notification → You Approve → Manual Paste to Turo
+```
+
+### Components
+- **Gmail API**: Monitors for Turo notification emails
+- **Claude AI**: Drafts contextual responses using vehicle info, policies, FAQ
+- **ntfy**: Free push notifications to your phone
+- **GitHub Actions**: Checks every 5 min during day, 15 min at night
+
+### Files
+```
+messaging/
+├── config/
+│   ├── vehicle_info.md      # Aether specs & features
+│   ├── policies.md          # Rental rules & fees
+│   ├── faq.md               # Common Q&A
+│   └── tone_guide.md        # Communication style
+├── scripts/
+│   ├── check_gmail.py       # Monitor Gmail
+│   ├── generate_response.py # AI response generation
+│   ├── send_notification.py # Push notifications
+│   └── workflow.py          # Main orchestration
+├── state/                   # Runtime state (not in git)
+├── SETUP.md                 # Detailed setup guide
+└── PROPOSAL.md              # Architecture docs
+```
+
+### Required Secrets
+| Secret | Purpose |
+|--------|--------|
+| `GMAIL_CREDENTIALS` | OAuth credentials (base64) |
+| `GMAIL_TOKEN` | Auth token (base64) |
+| `NTFY_TOPIC` | Push notification topic |
+
+### Notification Format
+```
+🚗 NEW TURO MESSAGE
+
+From: John D.
+Trip: Dec 20-23
+
+MESSAGE:
+"Does it come with FSD?"
+
+PROPOSED RESPONSE:
+"Hi John! Yes, FSD is included..."
+```
+
+### To Customize Responses
+Edit the markdown files in `messaging/config/` to update:
+- Vehicle features and quirks
+- Rental policies and fees  
+- FAQ answers
+- Tone and communication style
+
+---
+
 ## 📝 Changelog
+
+### December 13, 2025 - Messaging System
+- Added AI-powered guest message responses
+- Gmail API integration for message detection
+- ntfy push notifications for approval workflow
+- Context documents for vehicle, policies, FAQ
+- GitHub Actions workflow (every 5 min)
 
 ### December 13, 2025 - Initial Setup
 - Created Supabase database with full schema
