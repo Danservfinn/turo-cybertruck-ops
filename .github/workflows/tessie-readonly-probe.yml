@@ -1,0 +1,51 @@
+name: Read-only Tessie Probe
+
+on:
+  workflow_dispatch:
+
+jobs:
+  tessie-readonly-probe:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Run unit tests for redaction/reporting
+        run: python -m unittest tests.test_tessie_readonly_probe -v
+
+      - name: Generate redacted read-only Tessie report
+        env:
+          TESSIE_API_TOKEN: ${{ secrets.TESSIE_API_TOKEN }}
+          CYBERTRUCK_VIN: ${{ secrets.CYBERTRUCK_VIN }}
+        run: |
+          mkdir -p reports
+          python scripts/tessie_readonly_probe.py --output reports/tessie-readonly-report.json
+
+      - name: Publish report to job summary
+        run: |
+          {
+            echo '## Read-only Tessie report'
+            echo
+            echo 'No token, raw VIN, or location fields are emitted by this report.'
+            echo
+            echo '```json'
+            cat reports/tessie-readonly-report.json
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload redacted report artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tessie-readonly-report
+          path: reports/tessie-readonly-report.json
+          if-no-files-found: error
+          retention-days: 7
