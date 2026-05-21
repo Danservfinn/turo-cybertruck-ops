@@ -1,0 +1,91 @@
+name: Aether Vehicle Command
+
+on:
+  workflow_dispatch:
+    inputs:
+      command:
+        description: 'Command name (run dry_run + --list locally for options)'
+        required: true
+        type: string
+      destination:
+        description: 'Destination/address for navigate command'
+        required: false
+        type: string
+      payload_json:
+        description: 'Advanced JSON object payload, if needed'
+        required: false
+        type: string
+      dry_run:
+        description: 'Dry run only; do not send to vehicle'
+        required: true
+        type: boolean
+        default: true
+      confirm:
+        description: 'Required for execution: SEND TO AETHER'
+        required: false
+        type: string
+
+jobs:
+  aether-command:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Run command unit tests
+        run: python -m unittest tests.test_tessie_command -v
+
+      - name: Execute confirmation-gated Aether command
+        env:
+          TESSIE_API_TOKEN: ${{ secrets.TESSIE_API_TOKEN }}
+          CYBERTRUCK_VIN: ${{ secrets.CYBERTRUCK_VIN }}
+          COMMAND: ${{ inputs.command }}
+          DESTINATION: ${{ inputs.destination }}
+          PAYLOAD_JSON: ${{ inputs.payload_json }}
+          DRY_RUN: ${{ inputs.dry_run }}
+          CONFIRM: ${{ inputs.confirm }}
+        run: |
+          set -euo pipefail
+          mkdir -p reports
+          args=("$COMMAND")
+          if [[ -n "${DESTINATION:-}" ]]; then
+            args+=(--destination "$DESTINATION")
+          fi
+          if [[ -n "${PAYLOAD_JSON:-}" ]]; then
+            args+=(--payload-json "$PAYLOAD_JSON")
+          fi
+          if [[ "${DRY_RUN}" == "true" ]]; then
+            args+=(--dry-run)
+          else
+            args+=(--confirm "$CONFIRM")
+          fi
+          python scripts/tessie_command.py "${args[@]}" | tee reports/aether-command-receipt.json
+
+      - name: Publish redacted receipt to job summary
+        run: |
+          {
+            echo '## Aether command receipt'
+            echo
+            echo 'Receipt is redacted. Secrets and raw VIN are not emitted.'
+            echo
+            echo '```json'
+            cat reports/aether-command-receipt.json
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload redacted receipt artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: aether-command-receipt
+          path: reports/aether-command-receipt.json
+          if-no-files-found: error
+          retention-days: 7
