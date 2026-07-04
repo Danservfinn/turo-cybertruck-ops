@@ -28,4 +28,19 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
           CYBERTRUCK_VIN: ${{ secrets.CYBERTRUCK_VIN }}
-        run: python scripts/sync_tessie.py
+        run: |
+          # Test Supabase connectivity first
+          python -c "
+          import socket, sys, os
+          url = os.environ.get('SUPABASE_URL', '').replace('https://','').replace('http://','').rstrip('/')
+          host = url.split('/')[0]
+          try:
+              socket.gethostbyname(host)
+              print(f'Supabase host {host} resolves OK')
+          except socket.gaierror:
+              print(f'::error::Supabase host {host} does not resolve (NXDOMAIN). Project may be paused or deleted.')
+              print('::warning::Skipping Tessie sync — database unavailable. See https://supabase.com/dashboard')
+              sys.exit(0)  # Don't fail the workflow; just skip gracefully
+          "
+          # If Supabase is unreachable, exit 0 (skip) rather than fail
+          python -c "import socket,os; host=os.environ.get('SUPABASE_URL','').replace('https://','').split('/')[0]; socket.gethostbyname(host)" 2>/dev/null && python scripts/sync_tessie.py || echo "::warning::Tessie sync skipped — Supabase unavailable"

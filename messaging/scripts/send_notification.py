@@ -19,7 +19,7 @@ from datetime import datetime, timezone
 
 # Configuration
 SIGNAL_API_URL = os.environ.get("SIGNAL_API_URL", "http://localhost:8080")
-SIGNAL_PHONE = os.environ.get("SIGNAL_PHONE", "+19194133445")  # Your number
+SIGNAL_PHONE = os.environ.get("SIGNAL_PHONE", "")  # Set via env var, do not hardcode
 SIGNAL_SENDER = os.environ.get("SIGNAL_SENDER")  # Registered sender number
 
 # Alternative: ntfy.sh (free push notifications)

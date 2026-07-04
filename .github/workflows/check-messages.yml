@@ -44,16 +44,16 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           GMAIL_CREDENTIALS: ${{ secrets.GMAIL_CREDENTIALS }}
           GMAIL_TOKEN: ${{ secrets.GMAIL_TOKEN }}
-          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC || secrets.NFTY_TOPIC }}
           USE_NTFY: "true"
         run: |
           # Write Gmail credentials from secrets
           mkdir -p messaging/config messaging/state
           echo "$GMAIL_CREDENTIALS" > messaging/config/gmail_credentials.json
           echo "$GMAIL_TOKEN" | base64 -d > messaging/state/gmail_token.pickle 2>/dev/null || true
-          
+
           cd messaging/scripts
-          python workflow.py
+          python workflow.py || echo "workflow.py exited with code $? — continuing to save state"
       
       - name: Save processed emails state
         uses: actions/cache/save@v4

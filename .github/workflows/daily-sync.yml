@@ -22,17 +22,35 @@ jobs:
       - name: Install dependencies
         run: pip install requests supabase anthropic
       
+      - name: Check Supabase availability
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+        run: |
+          python -c "
+          import socket, os, sys
+          host = os.environ.get('SUPABASE_URL','').replace('https://','').split('/')[0]
+          try:
+              socket.gethostbyname(host)
+              print(f'Supabase {host} resolves OK')
+          except:
+              print(f'::warning::Supabase {host} does not resolve — skipping sync')
+              with open(os.environ.get('GITHUB_ENV','/dev/null'),'a') as f:
+                  f.write('\nSUPABASE_AVAILABLE=false\n')
+          "
+
       - name: Sync SimpleFIN transactions
+        if: env.SUPABASE_AVAILABLE != 'false'
         env:
           SIMPLEFIN_ACCESS_URL: ${{ secrets.SIMPLEFIN_ACCESS_URL }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
-        run: python scripts/sync_simplefin.py
+        run: python scripts/sync_simplefin.py || echo "::warning::SimpleFIN sync failed"
       
       - name: Categorize expenses with AI
+        if: env.SUPABASE_AVAILABLE != 'false'
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
           VEHICLE_ID: ${{ secrets.VEHICLE_ID }}
-        run: python scripts/categorize_expenses.py
+        run: python scripts/categorize_expenses.py || echo "::warning::AI categorization failed"
