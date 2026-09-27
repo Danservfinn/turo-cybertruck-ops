@@ -13,7 +13,7 @@ jobs:
           CYBERTRUCK_VIN: ${{ secrets.CYBERTRUCK_VIN }}
         run: |
           python - <<'EOF'
-          import json, os, urllib.request, urllib.error
+          import json, os, urllib.request
           from datetime import datetime, timezone
 
           token = os.environ["TESSIE_API_TOKEN"]
@@ -28,36 +28,32 @@ jobs:
           data = tessie("drives")
           results = data.get("results", [])
           print(f"drive records: {len(results)}")
-          if results:
-              print("sample keys:", sorted(results[0].keys()))
-              print("sample:", json.dumps(results[0])[:600])
 
           by_month = {}
           drives_out = []
           for d in results:
-              start = d.get("start_timestamp") or d.get("start_time") or d.get("date")
-              miles = None
-              for k in ("distance_miles", "miles", "distance"):
-                  if d.get(k) is not None:
-                      miles = float(d[k])
-                      break
-              if miles is None and d.get("distance_meters"):
-                  miles = float(d["distance_meters"]) / 1609.34
-              if start is None:
+              miles = d.get("odometer_distance")
+              if miles is None:
                   continue
-              ts = int(start) if str(start).isdigit() else start
-              try:
-                  iso = datetime.fromtimestamp(ts, tz=timezone.utc).isoformat() if isinstance(ts, int) else str(ts)
-              except Exception:
-                  iso = str(ts)
+              miles = float(miles)
+              ts = d.get("started_at")
+              if ts is None:
+                  continue
+              iso = datetime.fromtimestamp(int(ts), tz=timezone.utc).isoformat()
               ym = iso[:7]
+              tag = d.get("tag") or ""
               b = by_month.setdefault(ym, {"miles": 0.0, "drives": 0})
-              b["miles"] += miles or 0.0
+              b["miles"] += miles
               b["drives"] += 1
-              drives_out.append({"start": iso, "miles": round(miles or 0.0, 2)})
+              drives_out.append({
+                  "start": iso,
+                  "miles": round(miles, 2),
+                  "tag": tag,
+                  "start_loc": d.get("starting_location") or "",
+              })
 
           months = [{"month": ym, "miles": round(v["miles"], 1), "drives": v["drives"]} for ym, v in sorted(by_month.items())]
-          print(json.dumps({"months": months}, indent=1))
+          print(json.dumps({"months": months[-8:]}, indent=1))
           with open("tessie-drives.json", "w") as f:
               json.dump({"generated_at": datetime.now(timezone.utc).isoformat(), "months": months, "drives": drives_out}, f, indent=1)
           EOF
