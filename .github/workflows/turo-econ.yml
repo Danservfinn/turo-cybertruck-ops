@@ -17,7 +17,9 @@ jobs:
 
           secret = os.environ["SIMPLEFIN_ACCESS_URL"].strip()
           if secret.startswith("http"):
-              access = secret
+              base = secret
+          elif "@" in secret:
+              base = "https://" + secret
           else:
               req = urllib.request.Request(
                   "https://beta-bridge.simplefin.org/simplefin/auth",
@@ -25,11 +27,15 @@ jobs:
                   method="POST",
               )
               with urllib.request.urlopen(req, timeout=30) as r:
-                  access = r.read().decode().strip()
+                  base = r.read().decode().strip()
+
+          base = base.rstrip("/")
+          if "/accounts" not in base:
+              base = base + "/accounts"
 
           start = datetime.now(timezone.utc) - timedelta(days=400)
-          sep = "&" if "?" in access else "?"
-          url = access + sep + urllib.parse.urlencode({"start-date": int(start.timestamp())})
+          sep = "&" if "?" in base else "?"
+          url = base + sep + urllib.parse.urlencode({"start-date": int(start.timestamp())})
           req = urllib.request.Request(url)
           with urllib.request.urlopen(req, timeout=60) as r:
               data = json.load(r)
