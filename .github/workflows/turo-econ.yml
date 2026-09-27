@@ -1,0 +1,44 @@
+name: Turo Economics Pull
+
+on:
+  workflow_dispatch: # manual only
+
+jobs:
+  query:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Pull bank transactions from SimpleFIN
+        env:
+          SIMPLEFIN_ACCESS_URL: ${{ secrets.SIMPLEFIN_ACCESS_URL }}
+        run: |
+          python - <<'EOF'
+          import json, os, urllib.request, urllib.parse
+          from datetime import datetime, timedelta, timezone
+
+          access = os.environ["SIMPLEFIN_ACCESS_URL"]
+          start = datetime.now(timezone.utc) - timedelta(days=400)
+          params = urllib.parse.urlencode({"start-date": int(start.timestamp())})
+          url = f"{access}/accounts?{params}"
+          req = urllib.request.Request(url)
+          with urllib.request.urlopen(req, timeout=60) as r:
+              data = json.load(r)
+
+          out = []
+          for acct in data.get("accounts", []):
+              for t in acct.get("transactions", []):
+                  desc = t.get("description", "")
+                  if any(k in desc.lower() for k in ("turo", "tesla", "ally", "insurance", "geico")):
+                      posted = t.get("posted")
+                      d = datetime.fromtimestamp(posted, tz=timezone.utc).date().isoformat() if posted else None
+                      out.append({"date": d, "desc": desc[:80], "amount": float(t.get("amount", 0))})
+          out.sort(key=lambda x: x["date"] or "")
+          print(f"matched: {len(out)} transactions")
+          with open("turo-econ.json", "w") as f:
+              json.dump({"generated_at": datetime.now(timezone.utc).isoformat(), "txns": out}, f, indent=1)
+          EOF
+
+      - name: Upload report
+        uses: actions/upload-artifact@v4
+        with:
+          name: turo-econ
+          path: turo-econ.json
