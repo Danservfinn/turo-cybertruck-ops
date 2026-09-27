@@ -15,7 +15,19 @@ jobs:
           import json, os, urllib.request, urllib.parse
           from datetime import datetime, timedelta, timezone
 
-          access = os.environ["SIMPLEFIN_ACCESS_URL"]
+          secret = os.environ["SIMPLEFIN_ACCESS_URL"].strip()
+          if "@" in secret and not secret.startswith("http"):
+              # access-key format: exchange for a session URL
+              req = urllib.request.Request(
+                  "https://beta-bridge.simplefin.org/simplefin/auth",
+                  data=secret.encode(),
+                  method="POST",
+              )
+              with urllib.request.urlopen(req, timeout=30) as r:
+                  access = r.read().decode().strip()
+          else:
+              access = secret
+
           start = datetime.now(timezone.utc) - timedelta(days=400)
           params = urllib.parse.urlencode({"start-date": int(start.timestamp())})
           url = f"{access}/accounts?{params}"
