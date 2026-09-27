@@ -1,13 +1,19 @@
 import json, os, urllib.request, urllib.parse
+import base64
 from datetime import datetime, timedelta, timezone
 
 secret = os.environ["SIMPLEFIN_ACCESS_URL"].strip()
+HEADERS = {}
 print("secret form:", "starts-http" if secret.startswith("http") else ("has-at" if "@" in secret else "raw-key"))
 
 if secret.startswith("http"):
     base = secret
 elif "@" in secret:
-    base = "https://" + secret
+    # user:pass@host form; use https scheme with basic auth header
+    creds, host = secret.rsplit("@", 1)
+    base = "https://" + host
+    auth = base64.b64encode(creds.encode()).decode()
+    HEADERS = {"Authorization": "Basic " + auth}
 else:
     req = urllib.request.Request(
         "https://beta-bridge.simplefin.org/simplefin/auth",
@@ -26,7 +32,7 @@ sep = "&" if "?" in base else "?"
 url = base + sep + urllib.parse.urlencode({"start-date": int(start.timestamp())})
 print("fetching:", urllib.parse.urlsplit(url).netloc)
 
-req = urllib.request.Request(url)
+req = urllib.request.Request(url, headers=HEADERS)
 with urllib.request.urlopen(req, timeout=60) as r:
     data = json.load(r)
 
