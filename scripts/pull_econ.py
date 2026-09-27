@@ -16,7 +16,7 @@ else:
     creds, rest = "", body
 parts = rest.split("/", 1)
 hostport = parts[0]
-path = "/" + parts[1] if len(parts) > 1 else "/accounts"
+path = "/" + parts[1] if len(parts) > 1 else "/simplefin/accounts"
 
 base = f"https://{hostport}{path}"
 headers = {}
