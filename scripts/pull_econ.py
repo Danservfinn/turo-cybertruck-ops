@@ -1,38 +1,35 @@
-import json, os, urllib.request, urllib.parse
 import base64
+import json
+import os
+import re
+import urllib.parse
+import urllib.request
 from datetime import datetime, timedelta, timezone
 
 secret = os.environ["SIMPLEFIN_ACCESS_URL"].strip()
-HEADERS = {}
-print("secret form:", "starts-http" if secret.startswith("http") else ("has-at" if "@" in secret else "raw-key"))
 
-if secret.startswith("http"):
-    base = secret
-elif "@" in secret:
-    # user:pass@host form; use https scheme with basic auth header
-    creds, host = secret.rsplit("@", 1)
-    base = "https://" + host
-    auth = base64.b64encode(creds.encode()).decode()
-    HEADERS = {"Authorization": "Basic " + auth}
+# Strip any scheme, then split creds@host[:port][/path]
+body = re.sub(r"^https?://", "", secret)
+if "@" in body:
+    creds, rest = body.rsplit("@", 1)
 else:
-    req = urllib.request.Request(
-        "https://beta-bridge.simplefin.org/simplefin/auth",
-        data=secret.encode(),
-        method="POST",
-    )
-    with urllib.request.urlopen(req, timeout=30) as r:
-        base = r.read().decode().strip()
+    creds, rest = "", body
+parts = rest.split("/", 1)
+hostport = parts[0]
+path = "/" + parts[1] if len(parts) > 1 else "/accounts"
 
-base = base.rstrip("/")
-if not base.endswith("/accounts"):
-    base = base + "/accounts"
+base = f"https://{hostport}{path}"
+headers = {}
+if creds:
+    token = base64.b64encode(creds.encode()).decode()
+    headers["Authorization"] = "Basic " + token
 
 start = datetime.now(timezone.utc) - timedelta(days=400)
 sep = "&" if "?" in base else "?"
 url = base + sep + urllib.parse.urlencode({"start-date": int(start.timestamp())})
-print("fetching:", urllib.parse.urlsplit(url).netloc)
+print("host:", hostport)
 
-req = urllib.request.Request(url, headers=HEADERS)
+req = urllib.request.Request(url, headers=headers)
 with urllib.request.urlopen(req, timeout=60) as r:
     data = json.load(r)
 
