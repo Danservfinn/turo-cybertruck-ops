@@ -11,13 +11,14 @@ jobs:
         env:
           SIMPLEFIN_ACCESS_URL: ${{ secrets.SIMPLEFIN_ACCESS_URL }}
         run: |
-          python - <<'EOF'
+          python - <<'EOF2'
           import json, os, urllib.request, urllib.parse
           from datetime import datetime, timedelta, timezone
 
           secret = os.environ["SIMPLEFIN_ACCESS_URL"].strip()
-          if "@" in secret and not secret.startswith("http"):
-              # access-key format: exchange for a session URL
+          if secret.startswith("http"):
+              access = secret
+          else:
               req = urllib.request.Request(
                   "https://beta-bridge.simplefin.org/simplefin/auth",
                   data=secret.encode(),
@@ -25,12 +26,10 @@ jobs:
               )
               with urllib.request.urlopen(req, timeout=30) as r:
                   access = r.read().decode().strip()
-          else:
-              access = secret
 
           start = datetime.now(timezone.utc) - timedelta(days=400)
-          params = urllib.parse.urlencode({"start-date": int(start.timestamp())})
-          url = f"{access}/accounts?{params}"
+          sep = "&" if "?" in access else "?"
+          url = access + sep + urllib.parse.urlencode({"start-date": int(start.timestamp())})
           req = urllib.request.Request(url)
           with urllib.request.urlopen(req, timeout=60) as r:
               data = json.load(r)
@@ -47,7 +46,7 @@ jobs:
           print(f"matched: {len(out)} transactions")
           with open("turo-econ.json", "w") as f:
               json.dump({"generated_at": datetime.now(timezone.utc).isoformat(), "txns": out}, f, indent=1)
-          EOF
+          EOF2
 
       - name: Upload report
         uses: actions/upload-artifact@v4
