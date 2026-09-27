@@ -1,0 +1,73 @@
+name: Monthly Mileage Query
+
+on:
+  workflow_dispatch: # manual only
+
+jobs:
+  query:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install supabase
+
+      - name: Query monthly miles (Turo vs personal)
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          CYBERTRUCK_VIN: ${{ secrets.CYBERTRUCK_VIN }}
+        run: |
+          python - <<'EOF'
+          import json, os
+          from datetime import datetime, timezone
+          from supabase import create_client
+
+          sb = create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_SERVICE_KEY"])
+          vin = os.environ["CYBERTRUCK_VIN"]
+          veh = sb.table("vehicles").select("id").eq("vin", vin).execute()
+          vid = veh.data[0]["id"]
+
+          trips = sb.table("trips").select("started_at,miles,purpose,booking_id").eq("vehicle_id", vid).order("started_at", desc=False).execute()
+          rows = trips.data
+          print(f"total trips: {len(rows)}")
+
+          by_month = {}
+          for t in rows:
+              sa = t.get("started_at")
+              if not sa:
+                  continue
+              ym = sa[:7]
+              m = float(t.get("miles") or 0)
+              turo = bool(t.get("booking_id"))
+              b = by_month.setdefault(ym, {"total": 0.0, "turo": 0.0, "personal": 0.0, "trips": 0})
+              b["total"] += m
+              b["trips"] += 1
+              if turo:
+                  b["turo"] += m
+              else:
+                  b["personal"] += m
+
+          out = []
+          for ym in sorted(by_month):
+              b = by_month[ym]
+              out.append({
+                  "month": ym,
+                  "total_miles": round(b["total"], 1),
+                  "turo_miles": round(b["turo"], 1),
+                  "personal_miles": round(b["personal"], 1),
+                  "trips": b["trips"],
+              })
+          print(json.dumps({"months": out}, indent=1))
+          with open("mileage-report.json", "w") as f:
+              json.dump({"generated_at": datetime.now(timezone.utc).isoformat(), "months": out}, f, indent=1)
+          EOF
+
+      - name: Upload report
+        uses: actions/upload-artifact@v4
+        with:
+          name: mileage-report
+          path: mileage-report.json
